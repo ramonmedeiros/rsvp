@@ -75,6 +75,13 @@ func (s *Server) updateFamily(c *gin.Context) {
 
 	updatedFamily, err := s.spreadsheetService.ConfirmFamily(code, confirmed, comments)
 	if err != nil {
+		if err == spreadsheet.ErrAlreadyConfirmed {
+			c.AbortWithError(
+				http.StatusForbidden,
+				errors.Wrap(err, "already confirmed"))
+			return
+		}
+
 		c.AbortWithError(
 			http.StatusInternalServerError,
 			errors.Wrap(err, "could not update presence"))

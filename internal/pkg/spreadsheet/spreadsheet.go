@@ -37,6 +37,10 @@ const (
 	ReadRange = "Sheet1!A:F"
 )
 
+var (
+	ErrAlreadyConfirmed = errors.New("already confirmed")
+)
+
 func New(ctx context.Context, serviceAccount string, spreadsheetId string, logger *logging.Logger) (*Client, error) {
 	serviceAccountString, err := base64.RawStdEncoding.DecodeString(serviceAccount)
 	if err != nil {
@@ -128,7 +132,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 			if len(row) >= 6 {
 				timeString, ok := row[5].(string)
 				if ok {
-					confirmedAtTime, err := time.Parse(time.RFC3339, timeString)
+					confirmedAtTime, err := time.Parse(time.DateTime, timeString)
 					if err == nil {
 						confirmedAt = &confirmedAtTime
 					}
@@ -149,7 +153,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 }
 
 func (c *Client) ConfirmFamily(code string, confirmed bool, comments string) (*Family, error) {
-	_, line, err := c.GetFamily(code)
+	family, line, err := c.GetFamily(code)
 	if err != nil {
 		c.logger.Log(logging.Entry{
 			Severity: logging.Error,
@@ -161,6 +165,10 @@ func (c *Client) ConfirmFamily(code string, confirmed bool, comments string) (*F
 		return nil, err
 	}
 
+	if family.ConfirmedAt != nil {
+		return nil, ErrAlreadyConfirmed
+	}
+
 	confirmedString := "false"
 	if confirmed {
 		confirmedString = "true"
@@ -168,7 +176,7 @@ func (c *Client) ConfirmFamily(code string, confirmed bool, comments string) (*F
 
 	vr := sheets.ValueRange{
 		Range:  getUpdateRange(line),
-		Values: [][]any{{comments, confirmedString, time.Now().String()}},
+		Values: [][]any{{comments, confirmedString, time.Now().Format(time.DateTime)}},
 	}
 
 	_, err = c.service.Spreadsheets.Values.BatchUpdate(c.spreadsheetID,
