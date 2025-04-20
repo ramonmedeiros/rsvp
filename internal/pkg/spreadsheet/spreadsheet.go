@@ -116,22 +116,30 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 					}})
 			}
 
-			comments := ""
+			confirmedGuests := []string{}
 			if len(row) >= 4 {
-				comments = row[3].(string)
+				confirmedGuestsString, ok := row[3].(string)
+				if ok {
+					confirmedGuests = strings.Split(confirmedGuestsString, ",")
+				}
+			}
+
+			comments := ""
+			if len(row) >= 5 {
+				comments = row[4].(string)
 			}
 
 			confirmed := false
-			if len(row) >= 5 {
-				confirmedString := row[4].(string)
+			if len(row) >= 6 {
+				confirmedString := row[5].(string)
 				if strings.EqualFold(confirmedString, "true") {
 					confirmed = true
 				}
 			}
 
 			var confirmedAt *time.Time
-			if len(row) >= 6 {
-				timeString, ok := row[5].(string)
+			if len(row) >= 7 {
+				timeString, ok := row[6].(string)
 				if ok {
 					confirmedAtTime, err := time.Parse(time.DateTime, timeString)
 					if err == nil {
@@ -141,11 +149,12 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 			}
 
 			return &Family{
-				Name:           row[1].(string),
-				ExpectedGuests: strings.Split(expectedGuests, ","),
-				Comments:       comments,
-				Confirmed:      confirmed,
-				ConfirmedAt:    confirmedAt,
+				Name:            row[1].(string),
+				ExpectedGuests:  strings.Split(expectedGuests, ","),
+				ConfirmedGuests: confirmedGuests,
+				Comments:        comments,
+				Confirmed:       confirmed,
+				ConfirmedAt:     confirmedAt,
 			}, line + 2, nil
 		}
 	}
