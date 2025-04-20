@@ -21,16 +21,17 @@ type Client struct {
 }
 
 type Family struct {
-	Name           string     `json:"name"`
-	ExpectedGuests []string   `json:"expected_guests"`
-	Comments       string     `json:"comments"`
-	Confirmed      bool       `json:"confirmed"`
-	ConfirmedAt    *time.Time `json:"confirmed_at,omitempty"`
+	Name            string     `json:"name"`
+	ExpectedGuests  []string   `json:"expected_guests,omitempty"`
+	ConfirmedGuests []string   `json:"confirmed_guests,omitempty"`
+	Comments        string     `json:"comments"`
+	Confirmed       bool       `json:"confirmed"`
+	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
 }
 
 type API interface {
 	GetFamily(code string) (*Family, int, error)
-	ConfirmFamily(code string, confirmed bool, comments string) (*Family, error)
+	ConfirmFamily(code string, confirmedGuests []string, confirmed bool, comments string) (*Family, error)
 }
 
 const (
@@ -152,7 +153,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 	return nil, 0, errors.New("not found")
 }
 
-func (c *Client) ConfirmFamily(code string, confirmed bool, comments string) (*Family, error) {
+func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed bool, comments string) (*Family, error) {
 	family, line, err := c.GetFamily(code)
 	if err != nil {
 		c.logger.Log(logging.Entry{
@@ -175,8 +176,13 @@ func (c *Client) ConfirmFamily(code string, confirmed bool, comments string) (*F
 	}
 
 	vr := sheets.ValueRange{
-		Range:  getUpdateRange(line),
-		Values: [][]any{{comments, confirmedString, time.Now().Format(time.DateTime)}},
+		Range: getUpdateRange(line),
+		Values: [][]any{{
+			strings.Join(confirmedGuests, ","),
+			comments,
+			confirmedString,
+			time.Now().Format(time.DateTime),
+		}},
 	}
 
 	_, err = c.service.Spreadsheets.Values.BatchUpdate(c.spreadsheetID,
@@ -199,5 +205,5 @@ func (c *Client) ConfirmFamily(code string, confirmed bool, comments string) (*F
 }
 
 func getUpdateRange(lineNumber int) string {
-	return fmt.Sprintf(`Sheet1!D%d:F%d`, lineNumber, lineNumber)
+	return fmt.Sprintf(`Sheet1!D%d:G%d`, lineNumber, lineNumber)
 }

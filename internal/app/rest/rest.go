@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -70,10 +71,17 @@ func (s *Server) getFamily(c *gin.Context) {
 
 func (s *Server) updateFamily(c *gin.Context) {
 	code := c.Param("code")
-	confirmed := c.Query("confirmed") == "true"
-	comments := c.Query("comments")
 
-	updatedFamily, err := s.spreadsheetService.ConfirmFamily(code, confirmed, comments)
+	input := spreadsheet.Family{}
+	err := json.NewDecoder(c.Request.Body).Decode(&input)
+	if err != nil {
+		c.AbortWithError(
+			http.StatusBadRequest,
+			errors.Wrap(err, "could not parse input"))
+		return
+	}
+
+	updatedFamily, err := s.spreadsheetService.ConfirmFamily(code, input.ConfirmedGuests, input.Confirmed, input.Comments)
 	if err != nil {
 		if err == spreadsheet.ErrAlreadyConfirmed {
 			c.AbortWithError(
