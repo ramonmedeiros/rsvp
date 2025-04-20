@@ -35,7 +35,7 @@ type API interface {
 }
 
 const (
-	ReadRange = "Sheet1!A:F"
+	ReadRange = "Sheet1!A:G"
 )
 
 var (
