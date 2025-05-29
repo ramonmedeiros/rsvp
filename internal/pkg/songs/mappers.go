@@ -13,13 +13,14 @@ func MapSearchResultToSongs(tracks *spotify.FullTrackPage) []Song {
 	return lo.Map(tracks.Tracks, func(t spotify.FullTrack, _ int) Song {
 		return Song{
 			Artists: lo.Map(t.Artists, func(a spotify.SimpleArtist, _ int) Artist {
-				return Artist{
-					Name: a.Name,
-				}
+				return Artist{Name: a.Name}
 			}),
 			Endpoint:   t.Endpoint,
 			Name:       t.Name,
 			Popularity: int(t.Popularity),
+			Images: lo.Map(t.Album.Images, func(i spotify.Image, _ int) string {
+				return i.URL
+			}),
 		}
 	})
 }

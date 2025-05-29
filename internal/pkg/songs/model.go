@@ -16,6 +16,7 @@ type Client struct {
 
 type Song struct {
 	Artists    []Artist `json:"artists"`
+	Images     []string `json:"images"`
 	Endpoint   string   `json:"endpoint"`
 	Name       string   `json:"name"`
 	Popularity int      `json:"popularity"`
