@@ -1,14 +1,12 @@
 package rest
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"github.com/pkg/errors"
 
 	"cloud.google.com/go/logging"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/ramonmedeiros/rsvp/internal/pkg/songs"
 	"github.com/ramonmedeiros/rsvp/internal/pkg/spreadsheet"
 )
 
@@ -19,9 +17,11 @@ var (
 
 type Server struct {
 	spreadsheetService spreadsheet.API
+	songService        songs.API
 	port               string
 	logger             *logging.Logger
 	clientID           string
+	authenticatedCodes []string
 }
 
 type API interface {
@@ -30,72 +30,17 @@ type API interface {
 
 func New(
 	spreadsheetService spreadsheet.API,
+	songService songs.API,
 	port string, clientID string,
 	logger *logging.Logger) API {
 
 	return &Server{
 		spreadsheetService: spreadsheetService,
+		songService:        songService,
 		port:               port,
 		logger:             logger,
 		clientID:           clientID,
 	}
-}
-
-func (s *Server) getFamily(c *gin.Context) {
-	code := c.Param("code")
-
-	if code == "" {
-		c.AbortWithError(
-			http.StatusBadRequest,
-			errors.New("code is required"))
-		return
-	}
-
-	family, _, err := s.spreadsheetService.GetFamily(code)
-	if err != nil {
-		s.logger.Log(logging.Entry{
-			Severity: logging.Error,
-			Payload: map[string]interface{}{
-				"message": "could not retrieve event",
-				"code":    code,
-			}},
-		)
-		c.AbortWithError(
-			http.StatusInternalServerError,
-			errors.New("could not retrieve family"))
-		return
-	}
-
-	c.IndentedJSON(http.StatusOK, family)
-}
-
-func (s *Server) updateFamily(c *gin.Context) {
-	code := c.Param("code")
-
-	input := spreadsheet.Family{}
-	err := json.NewDecoder(c.Request.Body).Decode(&input)
-	if err != nil {
-		c.AbortWithError(
-			http.StatusBadRequest,
-			errors.Wrap(err, "could not parse input"))
-		return
-	}
-
-	updatedFamily, err := s.spreadsheetService.ConfirmFamily(code, input.ConfirmedGuests, input.Confirmed, input.Comments)
-	if err != nil {
-		if err == spreadsheet.ErrAlreadyConfirmed {
-			c.AbortWithError(
-				http.StatusForbidden,
-				errors.Wrap(err, "already confirmed"))
-			return
-		}
-
-		c.AbortWithError(
-			http.StatusInternalServerError,
-			errors.Wrap(err, "could not update presence"))
-		return
-	}
-	c.IndentedJSON(http.StatusCreated, updatedFamily)
 }
 
 func (s *Server) Serve() {
@@ -110,6 +55,8 @@ func (s *Server) Serve() {
 	// and endpoints
 	router.GET("/family/:code", s.getFamily)
 	router.POST("/family/:code", s.updateFamily)
+
+	router.GET("/song/:code/:term", s.searchSong)
 
 	router.Run("0.0.0.0:" + s.port)
 }
