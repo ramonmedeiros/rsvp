@@ -24,6 +24,7 @@ type Family struct {
 	Name            string     `json:"name"`
 	ExpectedGuests  []string   `json:"expected_guests,omitempty"`
 	ConfirmedGuests []string   `json:"confirmed_guests,omitempty"`
+	Songs           []string   `json:"songs,omitempty"`
 	Comments        string     `json:"comments"`
 	Confirmed       bool       `json:"confirmed"`
 	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
@@ -31,11 +32,11 @@ type Family struct {
 
 type API interface {
 	GetFamily(code string) (*Family, int, error)
-	ConfirmFamily(code string, confirmedGuests []string, confirmed bool, comments string) (*Family, error)
+	ConfirmFamily(code string, confirmedGuests []string, confirmed bool, songs []string, comments string) (*Family, error)
 }
 
 const (
-	ReadRange = "Sheet1!A:G"
+	ReadRange = "Sheet1!A:H"
 )
 
 var (
@@ -120,7 +121,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 			if len(row) >= 4 {
 				confirmedGuestsString, ok := row[3].(string)
 				if ok {
-					confirmedGuests = strings.Split(confirmedGuestsString, ",")
+					confirmedGuests = strings.Split(confirmedGuestsString, ";")
 				}
 			}
 
@@ -129,17 +130,25 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 				comments = row[4].(string)
 			}
 
-			confirmed := false
+			songs := []string{}
 			if len(row) >= 6 {
-				confirmedString := row[5].(string)
+				songsString, ok := row[5].(string)
+				if ok {
+					songs = strings.Split(songsString, ";")
+				}
+			}
+
+			confirmed := false
+			if len(row) >= 7 {
+				confirmedString := row[6].(string)
 				if strings.EqualFold(confirmedString, "true") {
 					confirmed = true
 				}
 			}
 
 			var confirmedAt *time.Time
-			if len(row) >= 7 {
-				timeString, ok := row[6].(string)
+			if len(row) >= 8 {
+				timeString, ok := row[7].(string)
 				if ok {
 					confirmedAtTime, err := time.Parse(time.DateTime, timeString)
 					if err == nil {
@@ -150,9 +159,10 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 
 			return &Family{
 				Name:            row[1].(string),
-				ExpectedGuests:  strings.Split(expectedGuests, ","),
+				ExpectedGuests:  strings.Split(expectedGuests, ";"),
 				ConfirmedGuests: confirmedGuests,
 				Comments:        comments,
+				Songs:           songs,
 				Confirmed:       confirmed,
 				ConfirmedAt:     confirmedAt,
 			}, line + 2, nil
@@ -162,7 +172,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 	return nil, 0, errors.New("not found")
 }
 
-func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed bool, comments string) (*Family, error) {
+func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed bool, songs []string, comments string) (*Family, error) {
 	family, line, err := c.GetFamily(code)
 	if err != nil {
 		c.logger.Log(logging.Entry{
@@ -187,8 +197,9 @@ func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed 
 	vr := sheets.ValueRange{
 		Range: getUpdateRange(line),
 		Values: [][]any{{
-			strings.Join(confirmedGuests, ","),
+			strings.Join(confirmedGuests, ";"),
 			comments,
+			strings.Join(songs, ";"),
 			confirmedString,
 			time.Now().Format(time.DateTime),
 		}},
@@ -214,5 +225,5 @@ func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed 
 }
 
 func getUpdateRange(lineNumber int) string {
-	return fmt.Sprintf(`Sheet1!D%d:G%d`, lineNumber, lineNumber)
+	return fmt.Sprintf(`Sheet1!D%d:H%d`, lineNumber, lineNumber)
 }

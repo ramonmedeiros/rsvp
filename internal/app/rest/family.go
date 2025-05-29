@@ -55,7 +55,7 @@ func (s *Server) updateFamily(c *gin.Context) {
 		return
 	}
 
-	updatedFamily, err := s.spreadsheetService.ConfirmFamily(code, input.ConfirmedGuests, input.Confirmed, input.Comments)
+	updatedFamily, err := s.spreadsheetService.ConfirmFamily(code, input.ConfirmedGuests, input.Confirmed, input.Songs, input.Comments)
 	if err != nil {
 		if err == spreadsheet.ErrAlreadyConfirmed {
 			c.AbortWithError(
