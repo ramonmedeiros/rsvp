@@ -3,6 +3,7 @@ package spreadsheet
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,29 +15,8 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 )
 
-type Client struct {
-	service       *sheets.Service
-	spreadsheetID string
-	logger        *logging.Logger
-}
-
-type Family struct {
-	Name            string     `json:"name"`
-	ExpectedGuests  []string   `json:"expected_guests,omitempty"`
-	ConfirmedGuests []string   `json:"confirmed_guests,omitempty"`
-	Songs           []string   `json:"songs,omitempty"`
-	Comments        string     `json:"comments"`
-	Confirmed       bool       `json:"confirmed"`
-	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
-}
-
-type API interface {
-	GetFamily(code string) (*Family, int, error)
-	ConfirmFamily(code string, confirmedGuests []string, confirmed bool, songs []string, comments string) (*Family, error)
-}
-
 const (
-	ReadRange = "Sheet1!A:H"
+	ReadRange = "Sheet1!A:I"
 )
 
 var (
@@ -146,9 +126,18 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 				}
 			}
 
-			var confirmedAt *time.Time
+			var alergies []Alergy
 			if len(row) >= 8 {
-				timeString, ok := row[7].(string)
+				alergiesString := row[7].(string)
+				err = json.NewDecoder(strings.NewReader(alergiesString)).Decode(&alergies)
+				if err != nil {
+					return nil, 0, err
+				}
+			}
+
+			var confirmedAt *time.Time
+			if len(row) >= 9 {
+				timeString, ok := row[8].(string)
 				if ok {
 					confirmedAtTime, err := time.Parse(time.DateTime, timeString)
 					if err == nil {
@@ -164,6 +153,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 				Comments:        comments,
 				Songs:           songs,
 				Confirmed:       confirmed,
+				Alergies:        alergies,
 				ConfirmedAt:     confirmedAt,
 			}, line + 2, nil
 		}
@@ -172,7 +162,7 @@ func (c *Client) GetFamily(code string) (*Family, int, error) {
 	return nil, 0, errors.New("not found")
 }
 
-func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed bool, songs []string, comments string) (*Family, error) {
+func (c *Client) ConfirmFamily(code string, updatedFamily Family) (*Family, error) {
 	family, line, err := c.GetFamily(code)
 	if err != nil {
 		c.logger.Log(logging.Entry{
@@ -190,17 +180,23 @@ func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed 
 	}
 
 	confirmedString := "false"
-	if confirmed {
+	if updatedFamily.Confirmed {
 		confirmedString = "true"
+	}
+
+	alergies, err := updatedFamily.GetAlergies()
+	if err != nil {
+		return nil, err
 	}
 
 	vr := sheets.ValueRange{
 		Range: getUpdateRange(line),
 		Values: [][]any{{
-			strings.Join(confirmedGuests, ";"),
-			comments,
-			strings.Join(songs, ";"),
+			strings.Join(updatedFamily.ConfirmedGuests, ";"),
+			updatedFamily.Comments,
+			strings.Join(updatedFamily.Songs, ";"),
 			confirmedString,
+			alergies,
 			time.Now().Format(time.DateTime),
 		}},
 	}
@@ -225,5 +221,5 @@ func (c *Client) ConfirmFamily(code string, confirmedGuests []string, confirmed 
 }
 
 func getUpdateRange(lineNumber int) string {
-	return fmt.Sprintf(`Sheet1!D%d:H%d`, lineNumber, lineNumber)
+	return fmt.Sprintf(`Sheet1!D%d:I%d`, lineNumber, lineNumber)
 }
