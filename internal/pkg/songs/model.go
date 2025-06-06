@@ -10,11 +10,13 @@ import (
 type Client struct {
 	clientID     string
 	clientSecret string
+	playlist     string
 	logger       *logging.Logger
 	cacheToken   *oauth2.Token
 }
 
 type Song struct {
+	ID         string   `json:"id"`
 	Artists    []Artist `json:"artists"`
 	Images     []string `json:"images"`
 	Endpoint   string   `json:"endpoint"`

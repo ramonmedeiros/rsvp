@@ -12,6 +12,7 @@ func MapSearchResultToSongs(tracks *spotify.FullTrackPage) []Song {
 
 	return lo.Map(tracks.Tracks, func(t spotify.FullTrack, _ int) Song {
 		return Song{
+			ID: t.ID.String(),
 			Artists: lo.Map(t.Artists, func(a spotify.SimpleArtist, _ int) Artist {
 				return Artist{Name: a.Name}
 			}),

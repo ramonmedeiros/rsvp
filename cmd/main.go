@@ -19,6 +19,7 @@ type config struct {
 	ProjectID           string `env:"PROJECT_ID,required"`
 	SpotifyClientID     string `env:"SPOTIFY_CLIENT_ID,required"`
 	SpotifyClientSecret string `env:"SPOTIFY_CLIENT_SECRET,required"`
+	SpotifyPlaylist     string `env:"SPOTIFY_PLAYLIST" envDefault:"3r69De7EiLiRNUqM2xeST1"`
 }
 
 func main() {

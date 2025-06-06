@@ -26,18 +26,25 @@ func New(ctx context.Context, clientID string, clientSecret string, logger *logg
 	}
 }
 
-func (c *Client) auth(ctx context.Context) error {
+func (c *Client) getConfig() *clientcredentials.Config {
+	return &clientcredentials.Config{
+		ClientID:     c.clientID,
+		ClientSecret: c.clientSecret,
+		TokenURL:     spotifyauth.TokenURL,
+		Scopes: []string{
+			spotifyauth.ScopePlaylistModifyPublic,
+			spotifyauth.ScopePlaylistReadPrivate,
+			spotifyauth.ScopePlaylistModifyPrivate,
+		},
+	}
+}
+
+func (c *Client) authServer(ctx context.Context) error {
 	if c.cacheToken != nil && time.Now().Before(c.cacheToken.Expiry) {
 		return nil
 	}
 
-	config := &clientcredentials.Config{
-		ClientID:     c.clientID,
-		ClientSecret: c.clientSecret,
-		TokenURL:     spotifyauth.TokenURL,
-	}
-
-	token, err := config.Token(ctx)
+	token, err := c.getConfig().Token(ctx)
 	if err != nil {
 		return err
 	}
@@ -45,13 +52,29 @@ func (c *Client) auth(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) Search(ctx context.Context, term string) ([]Song, error) {
-	err := c.auth(ctx)
+func (c *Client) GetUserAuthLink(redirectURI string) *spotifyauth.Authenticator {
+	return spotifyauth.New(
+		spotifyauth.WithRedirectURL(redirectURI),
+		spotifyauth.WithScopes(c.getConfig().Scopes...),
+		spotifyauth.WithClientID(c.getConfig().ClientID),
+		spotifyauth.WithClientSecret(c.getConfig().ClientSecret),
+	)
+}
+
+func (c *Client) getClient(ctx context.Context) (*spotify.Client, error) {
+	err := c.authServer(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	client := spotify.New(spotifyauth.New().Client(ctx, c.cacheToken))
+	return spotify.New(spotifyauth.New().Client(ctx, c.cacheToken), spotify.WithRetry(true)), nil
+}
+
+func (c *Client) Search(ctx context.Context, term string) ([]Song, error) {
+	client, err := c.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := client.Search(ctx, term, spotify.SearchTypeTrack, spotify.Limit(40))
 	if err != nil {
