@@ -27,7 +27,7 @@ type Family struct {
 }
 
 type Alergy struct {
-	Name  string `json:"name"`
+	Id    string `json:"id"`
 	Count int    `json:"count"`
 }
 
